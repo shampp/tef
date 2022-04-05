@@ -450,6 +450,8 @@ def run_exp3_ss(setting, model_dict, X, true_ids, n_rounds, cand_set_sz, ft):
 
 
 def policy_evaluation(bandit, setting, model_dict, X, true_ids, n_rounds, cand_set_sz, ft):
+    if bandit == 'EXP3-SS':
+        return run_exp3_ss(setting, model_dict, X, true_ids, n_rounds, cand_set_sz, ft)
     if bandit == 'EXP3':
         return run_exp3(setting, model_dict, X, true_ids, n_rounds, cand_set_sz, ft)
     if bandit == 'GPT':
