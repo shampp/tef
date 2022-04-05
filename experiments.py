@@ -337,6 +337,7 @@ def run_gpt(setting, model_dict, X, true_ids, n_rounds, cand_set_sz, ft):
 
 
 def run_exp3(setting, model_dict, X, true_ids, n_rounds, cand_set_sz, ft):
+    cand_set_sz = 25
     from random import Random
     rnd1 = Random()
     rnd1.seed(42)
@@ -349,9 +350,16 @@ def run_exp3(setting, model_dict, X, true_ids, n_rounds, cand_set_sz, ft):
     dstv = np.zeros(shape=(n_rounds, 1))
     r_t = 1
     w_t = dict()
-    cand = set()
-    
+    curr_id = true_ids[0]   #for curr_id in true_ids[:-1]:  #p_t = list()
+    curr_query = X[curr_id]
+    cand = get_recommendations(curr_query, cand_set_sz, model_dict, setting)
+    cand_sz = len(cand)
+    logger.info("candidate set are: {}".format(','.join(map(str, cand))))
+    S = [0 for i in range(cand_sz)]
+
     for t in range(n_rounds):
+        p = [ exp(eta*S[i]) for i in range(cand_sz) ]
+        p = p/sum(p)
         curr_id = rnd1.choice(true_ids)   #for curr_id in true_ids[:-1]:  #p_t = list()
         curr_query = X[curr_id]
         logging.info("Running recommendations for id : %d" %(curr_id))
@@ -359,22 +367,11 @@ def run_exp3(setting, model_dict, X, true_ids, n_rounds, cand_set_sz, ft):
         ground_actions = true_ids.copy()
         ground_actions.remove(curr_id)  #this is the possible set of actions that are correct
         ground_queries = X[ground_actions]
-        cand_t = get_recommendations(curr_query, cand_set_sz, model_dict, setting)
-        tsz = len(cand)
-        cand_sz = 1 if tsz == 0 else tsz
-        cand_t = cand_t.difference(cand)
-        tsz = len(cand_t)
-        cand_t_sz = 1 if tsz == 0 else tsz
-        for q in cand_t:
-            w_t[q] = eta/((1-eta)*cand_t_sz*cand_sz)
-        w_k = list(w_t.keys())
-        p_t = [ (1-eta)*w + eta/cand_sz for w in w_t.values() ]
-        cand.update(cand_t)
-        logger.info("candidate set are: {}".format(','.join(map(str, cand))))
-        ind = rnd2.choices(range(len(p_t)), weights=p_t)[0]
+        ind = rnd2.choices(range(len(p)), weights=p)[0]
         logger.info("getting recommendation scores")
-        score = get_recommendation_score(ground_queries,w_k[ind])
+        score = get_recommendation_score(ground_queries,list(cand)[ind])
         logger.info("recommendation score is: %f" %(score))
+        
         if score >= 0.5:
             r_t = 1
             if (t > 0):
@@ -383,8 +380,7 @@ def run_exp3(setting, model_dict, X, true_ids, n_rounds, cand_set_sz, ft):
             r_t = 0
             seq_error[t] = 1 if (t==0) else seq_error[t-1] + 1.0
 
-        r_hat = r_t/p_t[ind]
-        w_t[w_k[ind]] = w_t[w_k[ind]]*np.exp(eta*r_hat)
+        S[ind] = S[ind] +  1 - (1-r_t)/p[ind]
 
         simv[t] = get_similarity(ft, curr_query, w_k[ind])
         dstv[t] = get_distance(ft, curr_query, w_k[ind])
